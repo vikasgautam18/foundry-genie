@@ -1,0 +1,21 @@
+.env
+.env.local
+.env.*.local
+__pycache__/
+*.pyc
+.venv/
+venv/
+.chainlit/
+*.egg-info/
+dist/
+build/
+.idea/
+.vscode/
+
+# Terraform - DO NOT commit terraform.tfvars or state files
+**/*.tfvars
+**/*.tfvars.local
+**/.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl

@@ -1,0 +1,22 @@
+# Core dependencies
+azure-ai-projects>=1.0.0
+azure-ai-agents>=1.2.0b3
+azure-identity>=1.19.0
+azure-keyvault-secrets>=4.9.0
+
+# Web UI
+chainlit>=2.0.0
+
+# Teams bot
+aiohttp>=3.9,<4
+botbuilder-core>=4.16.1
+botbuilder-integration-aiohttp>=4.16.1
+
+# Token store
+redis>=5.0
+
+# Utilities
+python-dotenv>=1.0.1
+
+# Deployment
+gunicorn>=22.0.0

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "2be452ff-bb82-4443-91cb-2183512ddfc9",
+  "developer": {
+    "name": "Your Company",
+    "websiteUrl": "https://foundry-genie-webapp.azurewebsites.net",
+    "privacyUrl": "https://foundry-genie-webapp.azurewebsites.net/privacy",
+    "termsOfUseUrl": "https://foundry-genie-webapp.azurewebsites.net/terms"
+  },
+  "name": {
+    "short": "Campaign Assistant",
+    "full": "Market Campaign Analytics Assistant"
+  },
+  "description": {
+    "short": "Ask questions about campaign data",
+    "full": "AI-powered assistant that queries Databricks Genie Space for market campaign analytics — performance metrics, ROI, spend breakdowns, audience segments, and more."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#0078D4",
+  "bots": [
+    {
+      "botId": "2be452ff-bb82-4443-91cb-2183512ddfc9",
+      "scopes": ["personal", "team", "groupChat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal"],
+          "commands": [
+            {
+              "title": "help",
+              "description": "Get help on how to use this bot"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": []
+}

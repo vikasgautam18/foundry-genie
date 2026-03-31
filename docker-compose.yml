@@ -1,0 +1,16 @@
+services:
+  foundry-genie:
+    build: .
+    container_name: foundry-genie
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Point Azure CLI at a writable copy location
+      - AZURE_CONFIG_DIR=/tmp/.azure
+    volumes:
+      # Mount Azure CLI credentials (rw so az cli can update index files)
+      # In production, use managed identity or AZURE_CLIENT_ID/SECRET/TENANT_ID env vars instead
+      - ${HOME}/.azure:/tmp/.azure
+    restart: unless-stopped
