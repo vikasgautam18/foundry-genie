@@ -301,28 +301,10 @@ export LOG_LEVEL=DEBUG  # or INFO, WARNING, ERROR
 Foundry Genie uses the **Model Context Protocol (MCP)** to communicate with Databricks Genie Space:
 
 - **Endpoint**: `https://<workspace-url>/api/2.0/mcp/genie/<space_id>`
-- **Protocol**: MCP defines tools and resources for AI agents
 - **Benefits**: 
   - Structured data access to Genie queries
   - Safe tool invocation with approval workflows
   - Seamless integration with Azure AI Agents
-
-## 🛣️ Roadmap & Future Enhancements
-
-- Analytics dashboard for agent performance metrics
-- Multi-modal query support (charts, tables, exports)
-- Advanced caching layer for frequent queries
-- Slack bot integration
-- Custom metric definitions per user/team
-- Query result caching and optimization
-
-## 📝 Contributing
-
-Contributions are welcome! Please follow these guidelines:
-- Create feature branches from `main`
-- Ensure tests pass before submitting PRs
-- Update documentation for new features
-- Follow PEP 8 Python style guidelines
 
 ## ⚙️ Troubleshooting
 
@@ -343,7 +325,7 @@ Contributions are welcome! Please follow these guidelines:
 
 ## 📄 License
 
-[Specify your license here]
+[License](LICENSE)
 
 ## 👥 Support
 
