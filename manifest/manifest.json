@@ -2,12 +2,12 @@
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
   "manifestVersion": "1.17",
   "version": "1.0.0",
-  "id": "2be452ff-bb82-4443-91cb-2183512ddfc9",
+  "id": "571bec3a-2b63-4460-acda-52e643c0c8df",
   "developer": {
-    "name": "Your Company",
-    "websiteUrl": "https://foundry-genie-webapp.azurewebsites.net",
-    "privacyUrl": "https://foundry-genie-webapp.azurewebsites.net/privacy",
-    "termsOfUseUrl": "https://foundry-genie-webapp.azurewebsites.net/terms"
+    "name": "Microsoft India Pvt Ltd",
+    "websiteUrl": "https://foundry-genie-teams-bot-tgd20260410.azurewebsites.net",
+    "privacyUrl": "https://foundry-genie-teams-bot-tgd20260410.azurewebsites.net/privacy",
+    "termsOfUseUrl": "https://foundry-genie-teams-bot-tgd20260410.azurewebsites.net/terms"
   },
   "name": {
     "short": "Campaign Assistant",
@@ -24,7 +24,7 @@
   "accentColor": "#0078D4",
   "bots": [
     {
-      "botId": "2be452ff-bb82-4443-91cb-2183512ddfc9",
+      "botId": "571bec3a-2b63-4460-acda-52e643c0c8df",
       "scopes": ["personal", "team", "groupChat"],
       "supportsFiles": false,
       "isNotificationOnly": false,
@@ -42,5 +42,7 @@
     }
   ],
   "permissions": ["identity", "messageTeamMembers"],
-  "validDomains": []
+  "validDomains": [
+    "foundry-genie-teams-bot-tgd20260410.azurewebsites.net"
+  ]
 }

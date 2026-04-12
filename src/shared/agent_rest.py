@@ -112,6 +112,17 @@ class DatabricksOAuthTokenProvider:
         entra_token = self._credential.get_token(
             f"{_DATABRICKS_RESOURCE_ID}/.default"
         ).token
+        # Log token claims for federation debugging
+        try:
+            import json, base64
+            payload = entra_token.split(".")[1]
+            payload += "=" * (-len(payload) % 4)
+            claims = json.loads(base64.urlsafe_b64decode(payload))
+            logger.info("Entra token: iss=%s  sub=%s  oid=%s  aud=%s",
+                        claims.get("iss"), claims.get("sub"),
+                        claims.get("oid"), claims.get("aud"))
+        except Exception:
+            pass
         logger.info("Acquired Entra ID token for Databricks resource")
 
         # Step 2: Exchange for a Databricks OAuth token
@@ -128,6 +139,8 @@ class DatabricksOAuthTokenProvider:
             logger.info("Using workload identity federation (SP: %s)", self._databricks_sp_client_id)
 
         resp = requests.post(self._token_url, data=exchange_data, timeout=30)
+        if not resp.ok:
+            logger.error("Token exchange failed (%s): %s", resp.status_code, resp.text)
         resp.raise_for_status()
         data = resp.json()
 
