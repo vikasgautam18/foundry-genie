@@ -40,13 +40,22 @@ class GenieTeamsBot(ActivityHandler):
     """Bot that receives Teams messages and forwards to the Foundry Genie agent."""
 
     def __init__(self, token_store: RedisTokenStore | None = None) -> None:
+        self._agent: GenieMcpAgent | None = None
+        self._agent_ready = False
+        self._token_store = token_store
+        self._thread_map: dict[str, str] = {}
+        logger.info("GenieTeamsBot created (agent setup deferred to first message)")
+
+    def _ensure_agent(self) -> None:
+        """Lazily initialise the Foundry agent on first use."""
+        if self._agent_ready:
+            return
+        logger.info("Initialising Foundry agent...")
         self._agent = GenieMcpAgent(AgentConfig())
         self._agent._agents_client.__enter__()
         self._agent.setup()
-
-        self._token_store = token_store
-        self._thread_map: dict[str, str] = {}
-        logger.info("GenieTeamsBot initialised (agent=%s)", self._agent._agent.id)
+        self._agent_ready = True
+        logger.info("Foundry agent ready (agent=%s)", self._agent._agent.id)
 
     async def on_message_activity(self, turn_context: TurnContext) -> None:
         """Handle incoming messages from Teams and relay to the AI agent."""
@@ -66,6 +75,16 @@ class GenieTeamsBot(ActivityHandler):
                 return
 
         await turn_context.send_activity(Activity(type=ActivityTypes.typing))
+
+        # Lazy-init agent on first message so server starts fast
+        try:
+            await asyncio.to_thread(self._ensure_agent)
+        except Exception:
+            logger.exception("Failed to initialise Foundry agent")
+            await turn_context.send_activity(
+                "Sorry, I couldn't connect to the AI backend. Please try again shortly."
+            )
+            return
 
         conv_id = turn_context.activity.conversation.id
         thread_id = self._thread_map.get(conv_id)

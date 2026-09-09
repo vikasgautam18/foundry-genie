@@ -1,0 +1,91 @@
+<mxfile host="65bd71144e">
+    <diagram id="foundry-genie-impl" name="Genie Access Path">
+        <mxGraphModel dx="1060" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1000" pageHeight="780" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="Foundry Genie — Genie Access Path (Databricks REST API)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=16;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="180" y="6" width="640" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="webapp" value="&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; Foundry Genie Web App&amp;nbsp;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef3fb;strokeColor=#3b6ea5;dashed=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontSize=13;fontStyle=1;fontColor=#2b4b6b;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="115" width="380" height="560" as="geometry"/>
+                </mxCell>
+                <mxCell id="external" value="&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;External services&amp;nbsp;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f7f7f7;strokeColor=#999999;dashed=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=8;fontSize=13;fontStyle=1;fontColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="540" y="150" width="395" height="515" as="geometry"/>
+                </mxCell>
+                <mxCell id="user" value="User&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;web browser (Chainlit UI)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="44" width="300" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent" value="GenieClass .ask()&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;src/shared/agent_rest.py&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="160" width="300" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="functool" value="FunctionTool — executed LOCALLY&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;query_genie · follow_up_genie&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="295" width="300" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="genie" value="GenieClient&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Databricks Genie REST client&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="425" width="300" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="auth" value="Auth — bearer token&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;DatabricksOAuthTokenProvider (Entra ID → OAuth) / PAT&lt;br&gt;RedisTokenStore — U2M (Redis is external)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="550" width="300" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="foundry" value="Azure AI Foundry Agent (remote)&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;model deployment · decides when to call tools&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="648" y="202" width="235" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="dbx" value="Databricks Genie Space&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;POST /api/2.0/genie/spaces/{id}/start-conversation&lt;br&gt;POST .../conversations/{id}/messages&lt;br&gt;GET .../messages/{msg_id} (poll COMPLETED)&lt;br&gt;GET /api/2.0/sql/statements/{id}&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="611" y="470" width="299" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" value="question" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#333333;fontColor=#333333;fontSize=11;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0.6;entryY=0;entryDx=0;entryDy=0;" parent="1" source="user" target="agent" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" value="reply" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;dashed=1;strokeColor=#8a8a8a;fontColor=#8a8a8a;fontSize=11;exitX=0.35;exitY=0;exitDx=0;exitDy=0;entryX=0.35;entryY=1;entryDx=0;entryDy=0;" parent="1" source="agent" target="user" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" value="create message + run" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#333333;fontColor=#333333;fontSize=11;exitX=1;exitY=0.4;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" parent="1" source="agent" target="foundry" edge="1">
+                    <mxGeometry x="-0.4779" y="9" relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="516" y="188"/>
+                            <mxPoint x="516" y="229"/>
+                        </Array>
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e4" value="requires_action: tool call" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#333333;fontColor=#333333;fontSize=11;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="foundry" target="functool" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="513" y="265"/>
+                            <mxPoint x="513" y="330"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e5" value="execute locally" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#333333;fontColor=#333333;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="functool" target="genie" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e6" value="HTTPS REST" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#333333;fontColor=#333333;fontSize=11;exitX=1;exitY=0.4;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" parent="1" source="genie" target="dbx" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e7" value="answer + SQL + rows" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;dashed=1;strokeColor=#8a8a8a;fontColor=#8a8a8a;fontSize=11;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" parent="1" source="dbx" target="genie" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e8" value="submit_tool_outputs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;dashed=1;strokeColor=#8a8a8a;fontColor=#8a8a8a;fontSize=11;exitX=1;exitY=0.15;exitDx=0;exitDy=0;entryX=0;entryY=0.85;entryDx=0;entryDy=0;" parent="1" source="genie" target="foundry" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="527" y="436"/>
+                            <mxPoint x="527" y="279"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e9" value="final answer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;dashed=1;strokeColor=#8a8a8a;fontColor=#8a8a8a;fontSize=11;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" parent="1" source="foundry" target="agent" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="488" y="247"/>
+                            <mxPoint x="488" y="213"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e10" value="bearer token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;dashed=1;strokeColor=#d6b656;fontColor=#b8860b;fontSize=11;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" source="auth" target="genie" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

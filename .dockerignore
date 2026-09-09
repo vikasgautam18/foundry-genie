@@ -9,3 +9,4 @@ static/
 *.md
 !chainlit.md
 .env.example
+*.docx

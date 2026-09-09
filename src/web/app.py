@@ -50,6 +50,26 @@ def _get_token_store() -> RedisTokenStore:
 # ── In-memory PKCE state (short-lived, per auth flow) ────────────
 _pending_auth: dict[str, dict] = {}
 
+
+def _read_dbx_user_id_from_session() -> str | None:
+    """Read the dbx_user_id cookie from the current Chainlit WS session.
+
+    Chainlit stores the WSGI environ of the websocket-upgrade request on
+    cl.context.session.environ. The HTTP_COOKIE header from that request is
+    the only place we can recover the cookie set on /oauth/callback, since
+    Chainlit does not surface request cookies via cl.user_session.
+    """
+    try:
+        environ = getattr(cl.context.session, "environ", None) or {}
+    except Exception:
+        return None
+    cookie_header = environ.get("HTTP_COOKIE", "") or ""
+    for kv in cookie_header.split(";"):
+        kv = kv.strip()
+        if kv.startswith("dbx_user_id="):
+            return kv.split("=", 1)[1] or None
+    return None
+
 # ── Singleton agent instance (shared across all sessions) ────────
 _agent: GenieMcpAgent | None = None
 
@@ -119,6 +139,21 @@ if _IS_U2M:
         response.delete_cookie("dbx_user_id")
         return response
 
+    # Chainlit registers a catch-all `/{full_path:path}` route when its server
+    # module is imported. Because FastAPI matches routes in registration order,
+    # any /oauth/* route added via @fastapi_app.get(...) ends up AFTER the
+    # catch-all and never gets matched. Move our routes to the front so they win.
+    import fastapi.routing as _fr
+    _oauth_routes = [
+        r for r in fastapi_app.routes
+        if isinstance(r, _fr.APIRoute) and getattr(r, "path", "").startswith("/oauth/")
+    ]
+    for _r in _oauth_routes:
+        fastapi_app.routes.remove(_r)
+        fastapi_app.routes.insert(0, _r)
+    logger.info("U2M OAuth routes registered (front of route list): %s",
+                [r.path for r in _oauth_routes])
+
 
 # ── Chainlit lifecycle hooks ─────────────────────────────────────
 
@@ -132,14 +167,9 @@ async def on_chat_start():
 
     # In U2M mode, check for Databricks sign-in
     if _IS_U2M:
-        user_id = cl.user_session.get("dbx_user_id")
-        if not user_id:
-            # Try to read from the HTTP request cookie
-            http_request = cl.user_session.get("http_request")
-            if http_request:
-                user_id = http_request.cookies.get("dbx_user_id")
-            if user_id:
-                cl.user_session.set("dbx_user_id", user_id)
+        user_id = cl.user_session.get("dbx_user_id") or _read_dbx_user_id_from_session()
+        if user_id:
+            cl.user_session.set("dbx_user_id", user_id)
 
         store = _get_token_store()
         if not user_id or not store.has_valid_token(user_id):
@@ -177,14 +207,9 @@ async def on_message(message: cl.Message):
     # Resolve user token for U2M mode
     user_token = None
     if _IS_U2M:
-        user_id = cl.user_session.get("dbx_user_id")
-        if not user_id:
-            http_request = cl.user_session.get("http_request")
-            if http_request:
-                user_id = http_request.cookies.get("dbx_user_id")
-                cl.user_session.set("dbx_user_id", user_id)
-
+        user_id = cl.user_session.get("dbx_user_id") or _read_dbx_user_id_from_session()
         if user_id:
+            cl.user_session.set("dbx_user_id", user_id)
             user_token = get_valid_token(user_id, _get_token_store())
 
         if not user_token:
