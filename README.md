@@ -220,9 +220,25 @@ After starting the application, navigate to `http://localhost:8000`:
 
 ### Microsoft Teams Bot
 
-1. Deploy the Teams bot using the manifest in `manifest/manifest.json`
-2. Users can mention the bot and ask campaign-related questions
-3. The bot responds with insights from Databricks Genie Space
+Prerequisites: the Terraform stack is deployed (Azure Bot + Teams channel), and
+the Teams bot App Service is running.
+
+1. **Build the app package** (fills the bot id + host from Terraform outputs):
+   ```bash
+   ./manifest/package-teams-app.sh
+   # or: BOT_APP_ID=<guid> TEAMS_APP_URL=https://<host> ./manifest/package-teams-app.sh
+   ```
+   Produces `manifest/build/teams-app.zip` (git-ignored).
+2. **Sideload**: Teams → **Apps** → **Manage your apps** → **Upload an app** →
+   **Upload a custom app** → select `teams-app.zip`. (Requires custom-app upload
+   enabled in the Teams admin setup policy.)
+3. **Chat** with the *Campaign Assistant* bot and ask a campaign question.
+4. In **U2M** mode the bot first replies with a **Sign in to Databricks** card;
+   complete the browser sign-in, return to Teams, and ask again.
+
+> `manifest/manifest.json` is a template using `${BOT_APP_ID}` / `${TEAMS_HOST}`
+> placeholders — never commit real deployment ids; the script fills them at build
+> time. A **SingleTenant** bot only authenticates users in its own tenant.
 
 ## 🔐 Authentication Modes
 

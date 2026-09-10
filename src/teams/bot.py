@@ -22,6 +22,7 @@ from botbuilder.schema import Activity, ActivityTypes
 
 from shared.agent_rest import GenieMcpAgent, AgentConfig
 from shared.databricks_oauth import get_valid_token
+from shared.oauth_state import generate_signed_state
 from shared.token_store import RedisTokenStore
 
 logger = logging.getLogger(__name__)
@@ -30,10 +31,7 @@ _AUTH_MODE = os.environ.get("DATABRICKS_AUTH_MODE", "oauth").lower()
 _IS_U2M = _AUTH_MODE == "u2m"
 
 # Base URL for OAuth routes — set via env or default
-_BOT_HOST = os.environ.get(
-    "BOT_PUBLIC_URL",
-    "https://foundry-genie-teams-bot.azurewebsites.net",
-)
+_BOT_HOST = os.environ.get("BOT_PUBLIC_URL", "http://localhost:3978")
 
 
 class GenieTeamsBot(ActivityHandler):
@@ -87,11 +85,17 @@ class GenieTeamsBot(ActivityHandler):
             return
 
         conv_id = turn_context.activity.conversation.id
-        thread_id = self._thread_map.get(conv_id)
+        thread_id = (
+            self._token_store.get_thread(conv_id)
+            if self._token_store else self._thread_map.get(conv_id)
+        )
 
         if not thread_id:
             thread_id = self._agent.create_thread()
-            self._thread_map[conv_id] = thread_id
+            if self._token_store:
+                self._token_store.save_thread(conv_id, thread_id)
+            else:
+                self._thread_map[conv_id] = thread_id
             logger.info(
                 "Created Foundry thread %s for Teams conversation %s",
                 thread_id, conv_id,
@@ -115,7 +119,7 @@ class GenieTeamsBot(ActivityHandler):
         for member in members_added:
             if member.id != turn_context.activity.recipient.id:
                 welcome = (
-                    "**Welcome to the Market Campaign Assistant!**\n\n"
+                    "**Welcome to camp_buddy!**\n\n"
                     "I can answer questions about your campaign data — "
                     "performance metrics, ROI, spend breakdowns, audience "
                     "segments, and more.\n\n"
@@ -131,8 +135,23 @@ class GenieTeamsBot(ActivityHandler):
                     await turn_context.send_activity(welcome)
 
     async def _send_signin_card(self, turn_context: TurnContext, user_id: str) -> None:
-        """Send an Adaptive Card prompting the user to sign in to Databricks."""
-        signin_url = f"{_BOT_HOST}/oauth/login?user_id={user_id}"
+        """Send an Adaptive Card prompting the user to sign in to Databricks.
+
+        Security: binds an opaque, HMAC-signed *state* nonce to the
+        Bot-Framework-verified Teams ``user_id`` server-side (Redis). The
+        browser-visible URL carries only the nonce — never a user id — so a
+        crafted link can no longer bind one user's tokens to another identity.
+        """
+        if not self._token_store:
+            logger.error("Token store unavailable; cannot start sign-in.")
+            await turn_context.send_activity(
+                "Sign-in is temporarily unavailable. Please try again later."
+            )
+            return
+
+        state = generate_signed_state()
+        self._token_store.save_login_state(state, user_id)
+        signin_url = f"{_BOT_HOST}/oauth/login?state={state}"
         card = {
             "type": "AdaptiveCard",
             "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",

@@ -19,3 +19,12 @@ build/
 *.tfstate
 *.tfstate.*
 .terraform.lock.hcl
+ *.tfstate
+ *.tfstate.*
+**/*tfplan
+**/*.tfplan
+**/*.tfplan.*
+ **/*crash.log
+
+# Teams app package build output
+manifest/build/

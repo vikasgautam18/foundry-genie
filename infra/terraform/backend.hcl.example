@@ -1,0 +1,8 @@
+# Copy to backend.hcl (git-ignored) or generate it from the bootstrap output:
+#   cd bootstrap && terraform output -raw backend_hcl > ../backend.hcl
+# Then:  terraform init -backend-config=backend.hcl
+
+resource_group_name  = "genie_demo_rg"
+storage_account_name = "geniedemotfstate<random>"
+container_name       = "tfstate"
+key                  = "genie-demo.tfstate"

@@ -138,6 +138,33 @@ az webapp restart \
   --name "$APP_SERVICE_NAME" \
   --output none
 
+# ── Optional: build & deploy the Teams bot image (DEPLOY_TEAMS=1) ─────────
+if [[ "${DEPLOY_TEAMS:-0}" == "1" ]]; then
+  TEAMS_APP_NAME="${TEAMS_APP_SERVICE_NAME:-$(tf_output teams_app_service_name)}"
+  TEAMS_IMAGE="${ACR_LOGIN_SERVER}/foundry-genie-teams:${IMAGE_TAG}"
+  echo ""
+  echo "▶ Building and pushing Teams bot image (Dockerfile.teams)..."
+  az acr build \
+    --registry "$ACR_NAME" \
+    --image "foundry-genie-teams:${IMAGE_TAG}" \
+    --file "$PROJECT_DIR/Dockerfile.teams" \
+    "$PROJECT_DIR"
+  if [[ -n "$TEAMS_APP_NAME" ]]; then
+    az resource update \
+      --ids "$(az webapp show -g "$RESOURCE_GROUP" -n "$TEAMS_APP_NAME" --query id -o tsv)" \
+      --set properties.siteConfig.acrUseManagedIdentityCreds=true --output none
+    az webapp config container set \
+      --resource-group "$RESOURCE_GROUP" \
+      --name "$TEAMS_APP_NAME" \
+      --container-image-name "$TEAMS_IMAGE" \
+      --container-registry-url "https://${ACR_LOGIN_SERVER}" --output none
+    az webapp restart --resource-group "$RESOURCE_GROUP" --name "$TEAMS_APP_NAME" --output none
+    echo "  Teams bot deployed to $TEAMS_APP_NAME"
+  else
+    echo "  [warn] teams_app_service_name not found in Terraform outputs; skipped."
+  fi
+fi
+
 WEBAPP_URL="$(tf_output app_service_url)"
 WEBAPP_URL="${WEBAPP_URL:-https://${APP_SERVICE_NAME}.azurewebsites.net}"
 

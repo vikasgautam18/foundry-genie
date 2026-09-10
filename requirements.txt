@@ -13,7 +13,7 @@ botbuilder-core>=4.16.1
 botbuilder-integration-aiohttp>=4.16.1
 
 # Token store
-redis>=5.0
+redis>=5.0.1
 
 # Utilities
 python-dotenv>=1.0.1
