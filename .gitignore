@@ -21,6 +21,8 @@ build/
 .terraform.lock.hcl
  *.tfstate
  *.tfstate.*
+ tfplan
+ *.tfplan
 **/*tfplan
 **/*.tfplan
 **/*.tfplan.*

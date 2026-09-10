@@ -15,6 +15,10 @@ botbuilder-integration-aiohttp>=4.16.1
 # Token store
 redis>=5.0.1
 
+# GIC industry-premium tool (workbook parsing + HTTP)
+openpyxl>=3.1
+requests>=2.31
+
 # Utilities
 python-dotenv>=1.0.1
 

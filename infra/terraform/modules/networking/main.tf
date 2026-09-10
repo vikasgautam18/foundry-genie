@@ -144,6 +144,20 @@ resource "azurerm_network_security_group" "nsg" {
     destination_address_prefix = "AzureActiveDirectory"
   }
 
+  # Public HTTPS egress from the web tier — required by the GIC industry-premium
+  # tool, which fetches the workbook from https://www.gicouncil.in.
+  security_rule {
+    name                       = "allow-internet-https"
+    priority                   = 140
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = var.webapp_subnet_prefix
+    destination_address_prefix = "Internet"
+  }
+
   security_rule {
     name                       = "deny-all-outbound"
     priority                   = 4096

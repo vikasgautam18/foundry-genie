@@ -1,0 +1,4 @@
+# Dev/test-only dependencies (not installed in the production image).
+#   pip install -r requirements-dev.txt
+#   PYTHONPATH=src pytest src/test/
+pytest>=8.0

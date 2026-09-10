@@ -18,7 +18,9 @@ from dataclasses import dataclass, field
 import requests
 from azure.ai.agents import AgentsClient
 from azure.ai.agents.models import (
+    FunctionDefinition,
     FunctionTool,
+    FunctionToolDefinition,
     ListSortOrder,
     RequiredFunctionToolCall,
     SubmitToolOutputsAction,
@@ -29,9 +31,30 @@ from azure.keyvault.secrets import SecretClient
 
 from dotenv import load_dotenv
 
+from shared.gic_premium import (
+    GIC_PREMIUM_DESCRIPTION,
+    GIC_PREMIUM_SCHEMA,
+    query_industry_premium,
+)
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+def _build_gic_tool_definition() -> FunctionToolDefinition:
+    """Hand-written tool definition for the GIC industry-premium tool.
+
+    The schema is authored explicitly (GIC_PREMIUM_SCHEMA) rather than derived
+    from the function docstring, per the tool spec.
+    """
+    return FunctionToolDefinition(
+        function=FunctionDefinition(
+            name="query_industry_premium",
+            description=GIC_PREMIUM_DESCRIPTION,
+            parameters=GIC_PREMIUM_SCHEMA,
+        )
+    )
 
 
 # ── Azure credential ────────────────────────────────────────────────
@@ -399,6 +422,20 @@ Guidelines:
   4. If a query fails, suggest the user rephrase their question.
   5. You may answer general marketing-knowledge questions without the tools.
   6. When you get data rows, format them as a markdown table for the user.
+
+You also have **query_industry_premium** — the AUTHORITATIVE source for Indian
+NON-LIFE (general) insurance premium, reading the General Insurance Council
+segment-wise workbook directly. Use it (not web search) for any non-life
+premium, segment, ranking, or market-share question. When you use it:
+  1. It reports **Gross Direct Premium Income** — use that exact name. It is
+     **not** Gross Written Premium. If asked for GWP, give this figure under its
+     own name and say plainly that GWP is not what this source publishes.
+  2. Figures are in **INR crore** and usually **provisional** — say both.
+  3. It is **non-life only**. For a life insurer, say the report does not cover
+     them; never substitute a similarly named general insurer.
+  4. If the tool reports a fallback (`fell_back`), say which period is quoted.
+  5. If a name did not match, ask the user which candidate was meant — do not guess.
+  6. Never blend this tool's figures with searched or Genie figures in one table.
 """
 
 
@@ -468,6 +505,9 @@ class GenieMcpAgent:
 
         # Build FunctionTool from our Python functions
         self._func_tool = FunctionTool(functions=[query_genie, follow_up_genie])
+        # Hand-written definition for the GIC industry-premium tool (dispatched
+        # by name in _handle_tool_calls, not via FunctionTool).
+        self._gic_tool_def = _build_gic_tool_definition()
 
         self._agent = None
 
@@ -478,7 +518,7 @@ class GenieMcpAgent:
             model=self.cfg.model_deployment,
             name="market-campaign-genie-agent",
             instructions=AGENT_INSTRUCTIONS,
-            tools=self._func_tool.definitions,
+            tools=self._func_tool.definitions + [self._gic_tool_def],
         )
         logger.info("Created agent %s", self._agent.id)
         return self._agent.id
@@ -560,7 +600,12 @@ class GenieMcpAgent:
                 fn_args = json.loads(tc.function.arguments)
                 logger.info("Calling %s(%s)", fn_name, fn_args)
 
-                result = self._func_tool.execute(tc)
+                # GIC tool is dispatched by name (hand-written schema, not part
+                # of the FunctionTool). Everything else goes through FunctionTool.
+                if fn_name == "query_industry_premium":
+                    result = query_industry_premium(**fn_args)
+                else:
+                    result = self._func_tool.execute(tc)
                 outputs.append(ToolOutput(tool_call_id=tc.id, output=result))
                 logger.info("Function %s returned %d chars", fn_name, len(result))
 
