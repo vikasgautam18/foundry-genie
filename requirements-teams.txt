@@ -1,0 +1,14 @@
+# Extra dependency for the Teams bot image only.
+#
+# kaleido is Plotly's static image export engine (bundles a headless
+# Chromium-like binary, ~200-300MB). It's needed to render chart PNGs for
+# Teams Adaptive Card Image elements, but NOT for the Chainlit web path
+# (cl.Plotly serializes interactively via plotly.io.to_json, no kaleido).
+# Kept out of the shared requirements.txt so the web image stays lean.
+#
+# NOTE: requirements.txt pins plotly>=5.0, which resolves to the latest
+# plotly (7.x) — and plotly>=6 dropped support for legacy kaleido 0.2.x
+# (its to_image()/write_image() call into the new Kaleido v1 API and raise
+# "Image export requires the Kaleido package, v1.0.0 or greater" otherwise).
+# Kaleido v1 no longer takes an `engine=` kwarg either.
+kaleido>=1.0.0

@@ -19,7 +19,8 @@ from chainlit.server import app as fastapi_app
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, HTMLResponse
 
-from shared.agent_rest import GenieMcpAgent, AgentConfig
+from shared.agent_rest import GenieMcpAgent, AgentConfig, AgentReply
+from shared.charting import build_chart
 from shared.databricks_oauth import (
     build_auth_url,
     exchange_code,
@@ -223,16 +224,27 @@ async def on_message(message: cl.Message):
     await thinking_msg.send()
 
     try:
-        response = await cl.make_async(agent.ask)(
+        reply = await cl.make_async(agent.ask)(
             thread_id=thread_id,
             question=message.content,
             user_token=user_token,
         )
     except Exception as e:
         logger.exception("Agent error")
-        response = f"Something went wrong: {e}"
+        reply = AgentReply(text=f"Something went wrong: {e}")
 
-    thinking_msg.content = response
+    elements = []
+    for gr in reply.genie_results:
+        try:
+            fig = build_chart(gr.get("columns", []), gr.get("rows", []))
+        except Exception:
+            logger.exception("Chart build failed")
+            fig = None
+        if fig is not None:
+            elements.append(cl.Plotly(name="genie_chart", figure=fig, display="inline"))
+
+    thinking_msg.content = reply.text
+    thinking_msg.elements = elements
     await thinking_msg.update()
 
 

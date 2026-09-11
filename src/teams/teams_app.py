@@ -31,6 +31,7 @@ from shared.databricks_oauth import (
 )
 from shared.oauth_state import verify_state_signature
 from shared.token_store import RedisTokenStore
+from shared.chart_cache import ChartCache
 
 logging.basicConfig(
     level=logging.INFO,
@@ -75,7 +76,18 @@ ADAPTER.on_turn_error = on_adapter_error
 # Initialise token store for U2M mode
 _token_store = RedisTokenStore() if _AUTH_MODE == "u2m" else None
 
-BOT = GenieTeamsBot(token_store=_token_store)
+# Chart image cache for Teams (independent of auth mode) — used to host
+# rendered PNGs at a public bot-served URL. Optional: if Redis isn't
+# configured, the bot degrades to text-only answers (no chart images).
+try:
+    _chart_cache: ChartCache | None = ChartCache()
+    logger.info("Chart image cache ready (Redis)")
+except Exception:
+    logger.warning("Chart image cache unavailable (Redis not configured); "
+                    "Teams answers will be text-only, no chart images.")
+    _chart_cache = None
+
+BOT = GenieTeamsBot(token_store=_token_store, chart_cache=_chart_cache)
 
 # ── Routes ──────────────────────────────────────────────────────────
 
@@ -108,6 +120,23 @@ async def messages(req: web.Request) -> web.Response:
 async def health(_req: web.Request) -> web.Response:
     """Simple health-check endpoint."""
     return web.json_response({"status": "healthy"})
+
+
+async def get_chart(req: web.Request) -> web.Response:
+    """Serve a cached chart PNG at /charts/{chart_id}.png (anonymous, short-TTL).
+
+    Public by design: Teams clients fetch card images from end-user devices
+    over the internet, so this must be reachable without Bot Framework auth.
+    IDs are unguessable (uuid4) and entries expire quickly (see ChartCache).
+    """
+    if not _chart_cache:
+        return web.Response(status=404)
+
+    chart_id = req.match_info.get("chart_id", "")
+    png_bytes = _chart_cache.get(chart_id)
+    if png_bytes is None:
+        return web.Response(status=404)
+    return web.Response(body=png_bytes, content_type="image/png")
 
 
 async def oauth_login(req: web.Request) -> web.Response:
@@ -182,6 +211,7 @@ app = web.Application()
 app.router.add_post("/api/messages", messages)
 app.router.add_get("/api/health", health)
 app.router.add_get("/", health)
+app.router.add_get("/charts/{chart_id}.png", get_chart)
 
 # OAuth routes (U2M mode)
 if _AUTH_MODE == "u2m":
