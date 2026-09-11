@@ -19,4 +19,4 @@ print(f"\nAsking: {question}\n")
 with GenieMcpAgent() as agent:
     thread_id = agent.create_thread()
     answer = agent.ask(thread_id, question)
-    print(f"Response:\n{answer}\n")
+    print(f"Response:\n{answer.text}\n")

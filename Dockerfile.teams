@@ -3,11 +3,23 @@ FROM python:3.11-slim
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        # Headless Chrome runtime deps, required by Kaleido v1 (Plotly's
+        # static image export engine) to render chart PNGs for Teams.
+        libatk1.0-0 libatk-bridge2.0-0 libcups2 libatspi2.0-0 libxdamage1 \
+        libcairo2 libpango-1.0-0 libasound2 libxcomposite1 libxrandr2 \
+        libxkbcommon0 libgbm1 libxfixes3 libdrm2 libnss3 fonts-liberation \
+        libgtk-3-0 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements-teams.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-teams.txt
+
+# Pre-download Kaleido v1's headless Chrome at build time (rather than at
+# first chart render), so the image is self-contained and cold starts don't
+# depend on outbound network access to fetch the browser.
+RUN plotly_get_chrome -y
 
 COPY src/ ./src/
 

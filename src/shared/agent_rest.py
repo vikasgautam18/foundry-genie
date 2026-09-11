@@ -337,6 +337,38 @@ _current_user_token: contextvars.ContextVar[str | None] = contextvars.ContextVar
     "databricks_user_token", default=None
 )
 
+# ContextVar carries structured Genie results (columns/rows) produced by tool
+# calls during a single ask() invocation back to the caller. Using a ContextVar
+# (rather than an instance attribute on the singleton agent) keeps concurrent
+# requests isolated, since cl.make_async / asyncio.to_thread each copy_context()
+# per call.
+_last_genie_results: contextvars.ContextVar[list | None] = contextvars.ContextVar(
+    "last_genie_results", default=None
+)
+
+
+def _record_genie_result(result: dict) -> None:
+    """Append a structured Genie result (columns/rows) to the current request's bucket."""
+    bucket = _last_genie_results.get()
+    if bucket is None:
+        bucket = []
+        _last_genie_results.set(bucket)
+    bucket.append(result)
+
+
+@dataclass
+class AgentReply:
+    """Result of GenieMcpAgent.ask(): the assistant's text plus any structured
+    Genie query results (columns/rows) gathered during the run, so callers can
+    render charts/tables in addition to the text."""
+
+    text: str
+    genie_results: list = field(default_factory=list)
+
+    def __str__(self) -> str:
+        # Safety net for any code that still treats the return value as a string.
+        return self.text
+
 
 def _get_genie_client() -> GenieClient:
     """Return the appropriate GenieClient for the current auth mode.
@@ -371,6 +403,8 @@ def query_genie(question: str) -> str:
     try:
         client = _get_genie_client()
         result = client.query(question)
+        if isinstance(result, dict) and "rows" in result:
+            _record_genie_result(result)
         return json.dumps(result, default=str)
     except Exception as e:
         logger.exception("Genie query failed")
@@ -396,6 +430,8 @@ def follow_up_genie(conversation_id: str, question: str) -> str:
     try:
         client = _get_genie_client()
         result = client.follow_up(conversation_id, question)
+        if isinstance(result, dict) and "rows" in result:
+            _record_genie_result(result)
         return json.dumps(result, default=str)
     except Exception as e:
         logger.exception("Genie follow-up failed")
@@ -422,6 +458,11 @@ Guidelines:
   4. If a query fails, suggest the user rephrase their question.
   5. You may answer general marketing-knowledge questions without the tools.
   6. When you get data rows, format them as a markdown table for the user.
+  7. Never draw your own text/ASCII-art chart (bars made of block characters,
+     "Visual comparison" sections, etc.) — a real chart image is already
+     rendered and attached separately below your text reply, so any text-art
+     chart would be redundant. Stick to the markdown table and a short bullet
+     summary.
 
 You also have **query_industry_premium** — the AUTHORITATIVE source for Indian
 NON-LIFE (general) insurance premium, reading the General Insurance Council
@@ -544,12 +585,14 @@ class GenieMcpAgent:
         user_token: str | None = None,
         poll_interval: float = 1.0,
         timeout: float = 180.0,
-    ) -> str:
+    ) -> AgentReply:
         if self._agent is None:
             raise RuntimeError("Call setup() before ask().")
 
         # Set per-request user token for U2M mode (read by tool functions)
         _current_user_token.set(user_token)
+        # Reset the per-request Genie results bucket (ContextVar isolates concurrent calls)
+        _last_genie_results.set([])
 
         self._agents_client.messages.create(
             thread_id=thread_id, role="user", content=question
@@ -566,7 +609,10 @@ class GenieMcpAgent:
                 self._agents_client.runs.cancel(
                     thread_id=thread_id, run_id=run.id
                 )
-                return "The request timed out. Please try a simpler question."
+                return AgentReply(
+                    text="The request timed out. Please try a simpler question.",
+                    genie_results=_last_genie_results.get() or [],
+                )
 
             # Handle function-call requests from the model
             if run.status == "requires_action" and isinstance(
@@ -584,9 +630,15 @@ class GenieMcpAgent:
         if run.status == "failed":
             err = run.last_error or "unknown error"
             logger.error("Run failed: %s", err)
-            return f"Agent run failed: {err}"
+            return AgentReply(
+                text=f"Agent run failed: {err}",
+                genie_results=_last_genie_results.get() or [],
+            )
 
-        return self._latest_assistant_text(thread_id)
+        return AgentReply(
+            text=self._latest_assistant_text(thread_id),
+            genie_results=_last_genie_results.get() or [],
+        )
 
     # ── internal helpers ─────────────────────────────────────────────
 

@@ -20,10 +20,12 @@ import os
 from botbuilder.core import ActivityHandler, TurnContext, CardFactory
 from botbuilder.schema import Activity, ActivityTypes
 
-from shared.agent_rest import GenieMcpAgent, AgentConfig
+from shared.agent_rest import GenieMcpAgent, AgentConfig, AgentReply
 from shared.databricks_oauth import get_valid_token
 from shared.oauth_state import generate_signed_state
 from shared.token_store import RedisTokenStore
+from shared.charting import build_chart, chart_to_native_points
+from shared.chart_cache import ChartCache
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +39,12 @@ _BOT_HOST = os.environ.get("BOT_PUBLIC_URL", "http://localhost:3978")
 class GenieTeamsBot(ActivityHandler):
     """Bot that receives Teams messages and forwards to the Foundry Genie agent."""
 
-    def __init__(self, token_store: RedisTokenStore | None = None) -> None:
+    def __init__(self, token_store: RedisTokenStore | None = None,
+                 chart_cache: ChartCache | None = None) -> None:
         self._agent: GenieMcpAgent | None = None
         self._agent_ready = False
         self._token_store = token_store
+        self._chart_cache = chart_cache
         self._thread_map: dict[str, str] = {}
         logger.info("GenieTeamsBot created (agent setup deferred to first message)")
 
@@ -110,9 +114,128 @@ class GenieTeamsBot(ActivityHandler):
             )
         except Exception:
             logger.exception("Agent call failed")
-            reply = "Sorry, something went wrong while processing your request."
+            reply = AgentReply(text="Sorry, something went wrong while processing your request.")
 
-        await turn_context.send_activity(reply)
+        await turn_context.send_activity(reply.text)
+
+        # Best-effort chart rendering — never let a charting failure affect
+        # the text reply already sent above.
+        try:
+            await self._send_charts(turn_context, reply.genie_results)
+        except Exception:
+            logger.exception("Chart rendering failed")
+
+    async def _send_charts(self, turn_context: TurnContext, genie_results: list) -> None:
+        """Send a follow-up Adaptive Card chart for each chart-worthy Genie result.
+
+        PNG rendering (via Plotly's kaleido engine, hosted at this bot's own
+        ``/charts/{id}.png`` route) is used whenever a ``ChartCache`` is
+        available — this is the same rendering already confirmed working on
+        the web UI, so it is preferred over native Adaptive Card ``Chart.*``
+        elements, whose exact rendering behavior varies across Teams clients
+        and has proven unreliable in testing. Native cards are used only as a
+        best-effort fallback when Redis/ChartCache isn't configured.
+        """
+        for gr in genie_results:
+            fig = build_chart(gr.get("columns", []), gr.get("rows", []))
+            if fig is None:
+                continue
+
+            if self._chart_cache is not None:
+                png_bytes = await asyncio.to_thread(
+                    fig.to_image, format="png", width=800, height=500
+                )
+                chart_id = self._chart_cache.put(png_bytes)
+                url = f"{_BOT_HOST}/charts/{chart_id}.png"
+                title = (fig.layout.title.text if fig.layout.title else None) or "Chart"
+                card = self._build_image_card(url, title)
+            else:
+                native = chart_to_native_points(fig)
+                if native is None:
+                    logger.info("Skipping complex chart: no ChartCache and not native-renderable")
+                    continue
+                card = self._build_native_chart_card(native)
+
+            await turn_context.send_activity(
+                Activity(type=ActivityTypes.message, attachments=[CardFactory.adaptive_card(card)])
+            )
+
+    @staticmethod
+    def _build_native_chart_card(native: dict) -> dict:
+        """Build a native Adaptive Card Chart.* element (v1.5) for a simple,
+        single-series bar/line/pie result, with a text fallback for older
+        clients that don't support the Chart.* host extension.
+
+        Field shapes differ per chart type (Adaptive Cards charts-in-cards
+        schema): Chart.Pie/Donut use flat {legend, value}; Chart.VerticalBar
+        uses flat {x, y}; Chart.Line requires a nested single-series
+        {legend, values: [{x, y}, ...]}.
+        """
+        kind = native["kind"]
+        title = native["title"] or "Chart"
+        points = native["points"]
+        summary = ", ".join(f"{label}: {value}" for label, value in points)
+
+        if kind == "pie":
+            chart_type = "Chart.Pie"
+            body_element = {
+                "type": chart_type,
+                "title": title,
+                "data": [{"legend": str(label), "value": float(value)} for label, value in points],
+            }
+        elif kind == "bar":
+            chart_type = "Chart.VerticalBar"
+            body_element = {
+                "type": chart_type,
+                "title": title,
+                "data": [{"x": str(label), "y": float(value)} for label, value in points],
+            }
+        else:  # "line"
+            chart_type = "Chart.Line"
+            body_element = {
+                "type": chart_type,
+                "title": title,
+                "data": [{
+                    "legend": title,
+                    "values": [{"x": str(label), "y": float(value)} for label, value in points],
+                }],
+            }
+
+        body_element["fallback"] = {
+            "type": "TextBlock",
+            "text": f"**{title}**: {summary}",
+            "wrap": True,
+        }
+
+        return {
+            "type": "AdaptiveCard",
+            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "version": "1.5",
+            "body": [body_element],
+        }
+
+    @staticmethod
+    def _build_image_card(url: str, title: str) -> dict:
+        """Build an Adaptive Card hosting a chart PNG at a public URL."""
+        return {
+            "type": "AdaptiveCard",
+            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "version": "1.4",
+            "body": [
+                {
+                    "type": "TextBlock",
+                    "text": f"**{title}**",
+                    "wrap": True,
+                    "weight": "Bolder",
+                },
+                {
+                    "type": "Image",
+                    "url": url,
+                    "altText": title,
+                    "size": "Stretch",
+                },
+            ],
+        }
 
     async def on_members_added_activity(self, members_added, turn_context: TurnContext):
         """Greet new members when they join the conversation."""

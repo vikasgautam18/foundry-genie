@@ -32,75 +32,99 @@ def _truthy(val: str | None) -> bool:
     return (val or "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def build_redis_client(decode_responses: bool = True) -> "redis.Redis":
+    """Build a Redis client using the repo's standard env-driven auth selection.
+
+    Shared by ``RedisTokenStore`` (text mode, for tokens/threads/state) and
+    ``ChartCache`` (binary mode, for PNG bytes) so both reuse the same
+    entra-vs-key connection logic.
+
+    - ``REDIS_USE_ENTRA=true`` → Microsoft Entra ID via the App Service managed
+      identity (required when the cache has access-key auth disabled). Needs
+      ``REDIS_HOST`` (and optional ``REDIS_PORT``, default 6380).
+    - otherwise → ``REDIS_URL`` key-based connection string, e.g.
+      ``rediss://:password@host:6380/0`` (local dev / docker-compose).
+    """
+    if _truthy(os.environ.get("REDIS_USE_ENTRA")):
+        client = _connect_entra(decode_responses=decode_responses)
+        logger.info("Redis client connected (entra, decode_responses=%s)", decode_responses)
+        return client
+
+    url = os.environ.get("REDIS_URL")
+    if not url:
+        raise ValueError(
+            "Redis is not configured. Set REDIS_USE_ENTRA=true (with "
+            "REDIS_HOST) for managed-identity auth, or REDIS_URL for "
+            "key-based auth."
+        )
+    client = redis.from_url(url, decode_responses=decode_responses)
+    logger.info("Redis client connected (key, decode_responses=%s)", decode_responses)
+    return client
+
+
+def _connect_entra(decode_responses: bool = True) -> "redis.Redis":
+    """Build a redis client authenticated with a managed-identity Entra token.
+
+    Uses ``azure-identity`` directly (ManagedIdentityCredential on Azure hosts,
+    which correctly uses the App Service / Container Apps MSI endpoint) via a
+    redis-py CredentialProvider, with socket timeouts so a network or token
+    problem fails fast with a clear error instead of hanging the request.
+    """
+    from azure.identity import ManagedIdentityCredential, DefaultAzureCredential
+    from redis.credentials import CredentialProvider
+
+    host = os.environ.get("REDIS_HOST")
+    if not host:
+        raise ValueError("REDIS_HOST is required when REDIS_USE_ENTRA=true.")
+    port = int(os.environ.get("REDIS_PORT", "6380"))
+    client_id = os.environ.get("AZURE_CLIENT_ID")
+
+    # On Azure (App Service / ACA) use the managed identity endpoint directly;
+    # locally fall back to DefaultAzureCredential (az login, etc.).
+    if os.environ.get("WEBSITE_INSTANCE_ID") or os.environ.get("CONTAINER_APP_NAME"):
+        credential = (
+            ManagedIdentityCredential(client_id=client_id)
+            if client_id else ManagedIdentityCredential()
+        )
+    else:
+        credential = DefaultAzureCredential()
+
+    class _EntraCredentialProvider(CredentialProvider):
+        """Returns (username=object-id, password=Entra token) for Redis AUTH."""
+
+        def get_credentials(self):
+            token = credential.get_token(f"{_REDIS_ENTRA_RESOURCE}.default").token
+            # Azure Cache for Redis expects the identity's object id (oid) as
+            # the ACL username; extract it from the token's claims.
+            payload = token.split(".")[1]
+            payload += "=" * (-len(payload) % 4)
+            oid = json.loads(base64.urlsafe_b64decode(payload)).get("oid", "")
+            return (oid, token)
+
+    return redis.Redis(
+        host=host,
+        port=port,
+        ssl=True,
+        credential_provider=_EntraCredentialProvider(),
+        decode_responses=decode_responses,
+        socket_connect_timeout=10,
+        socket_timeout=10,
+        retry_on_timeout=True,
+        health_check_interval=30,
+    )
+
+
+
 class RedisTokenStore:
     """Manages per-user Databricks OAuth tokens in Redis."""
 
     def __init__(self, redis_url: str | None = None):
-        if _truthy(os.environ.get("REDIS_USE_ENTRA")):
-            self._client = self._connect_entra()
-            logger.info("RedisTokenStore connected (entra)")
+        if redis_url:
+            self._client = redis.from_url(redis_url, decode_responses=True)
+            logger.info("RedisTokenStore connected (key, explicit url)")
         else:
-            url = redis_url or os.environ.get("REDIS_URL")
-            if not url:
-                raise ValueError(
-                    "Redis is not configured. Set REDIS_USE_ENTRA=true (with "
-                    "REDIS_HOST) for managed-identity auth, or REDIS_URL for "
-                    "key-based auth."
-                )
-            self._client = redis.from_url(url, decode_responses=True)
-            logger.info("RedisTokenStore connected (key)")
-
-    @staticmethod
-    def _connect_entra() -> "redis.Redis":
-        """Build a redis client authenticated with a managed-identity Entra token.
-
-        Uses ``azure-identity`` directly (ManagedIdentityCredential on Azure hosts,
-        which correctly uses the App Service / Container Apps MSI endpoint) via a
-        redis-py CredentialProvider, with socket timeouts so a network or token
-        problem fails fast with a clear error instead of hanging the request.
-        """
-        from azure.identity import ManagedIdentityCredential, DefaultAzureCredential
-        from redis.credentials import CredentialProvider
-
-        host = os.environ.get("REDIS_HOST")
-        if not host:
-            raise ValueError("REDIS_HOST is required when REDIS_USE_ENTRA=true.")
-        port = int(os.environ.get("REDIS_PORT", "6380"))
-        client_id = os.environ.get("AZURE_CLIENT_ID")
-
-        # On Azure (App Service / ACA) use the managed identity endpoint directly;
-        # locally fall back to DefaultAzureCredential (az login, etc.).
-        if os.environ.get("WEBSITE_INSTANCE_ID") or os.environ.get("CONTAINER_APP_NAME"):
-            credential = (
-                ManagedIdentityCredential(client_id=client_id)
-                if client_id else ManagedIdentityCredential()
-            )
-        else:
-            credential = DefaultAzureCredential()
-
-        class _EntraCredentialProvider(CredentialProvider):
-            """Returns (username=object-id, password=Entra token) for Redis AUTH."""
-
-            def get_credentials(self):
-                token = credential.get_token(f"{_REDIS_ENTRA_RESOURCE}.default").token
-                # Azure Cache for Redis expects the identity's object id (oid) as
-                # the ACL username; extract it from the token's claims.
-                payload = token.split(".")[1]
-                payload += "=" * (-len(payload) % 4)
-                oid = json.loads(base64.urlsafe_b64decode(payload)).get("oid", "")
-                return (oid, token)
-
-        return redis.Redis(
-            host=host,
-            port=port,
-            ssl=True,
-            credential_provider=_EntraCredentialProvider(),
-            decode_responses=True,
-            socket_connect_timeout=10,
-            socket_timeout=10,
-            retry_on_timeout=True,
-            health_check_interval=30,
-        )
+            self._client = build_redis_client(decode_responses=True)
+            logger.info("RedisTokenStore connected")
 
     def _key(self, user_id: str) -> str:
         return f"dbx_token:{user_id}"

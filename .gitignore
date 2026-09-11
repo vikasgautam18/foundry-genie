@@ -12,6 +12,8 @@ build/
 .idea/
 .vscode/
 
+ignore/
+
 # Terraform - DO NOT commit terraform.tfvars or state files
 **/*.tfvars
 **/*.tfvars.local
