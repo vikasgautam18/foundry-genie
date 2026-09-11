@@ -47,8 +47,7 @@ def _get_token_store() -> RedisTokenStore:
         _token_store = RedisTokenStore()
     return _token_store
 
-# ── In-memory PKCE state (short-lived, per auth flow) ────────────
-_pending_auth: dict[str, dict] = {}
+# ── PKCE state is stored in Redis (multi-worker safe), keyed by state ─
 
 
 def _read_dbx_user_id_from_session() -> str | None:
@@ -94,7 +93,7 @@ if _IS_U2M:
         """Redirect user to Databricks OAuth sign-in."""
         verifier, challenge = generate_pkce()
         state = generate_state()
-        _pending_auth[state] = {"code_verifier": verifier}
+        _get_token_store().save_pkce_verifier(state, verifier)
         auth_url = build_auth_url(state=state, code_challenge=challenge)
         return RedirectResponse(auth_url)
 
@@ -104,10 +103,12 @@ if _IS_U2M:
         code = request.query_params.get("code")
         state = request.query_params.get("state")
 
-        if not code or not state or state not in _pending_auth:
+        if not code or not state:
             return HTMLResponse("<h3>Invalid OAuth callback. Please try signing in again.</h3>", status_code=400)
 
-        verifier = _pending_auth.pop(state)["code_verifier"]
+        verifier = _get_token_store().consume_pkce_verifier(state)
+        if not verifier:
+            return HTMLResponse("<h3>Sign-in session expired. Please try signing in again.</h3>", status_code=400)
 
         try:
             tokens = exchange_code(code=code, code_verifier=verifier)
@@ -125,7 +126,7 @@ if _IS_U2M:
         )
 
         response = RedirectResponse("/")
-        response.set_cookie("dbx_user_id", user_id, httponly=True, secure=True, max_age=7 * 86400)
+        response.set_cookie("dbx_user_id", user_id, httponly=True, secure=True, samesite="lax", max_age=7 * 86400)
         logger.info("OAuth sign-in complete for user %s", user_id)
         return response
 

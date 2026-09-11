@@ -2,16 +2,16 @@
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
   "manifestVersion": "1.17",
   "version": "1.0.0",
-  "id": "571bec3a-2b63-4460-acda-52e643c0c8df",
+  "id": "${BOT_APP_ID}",
   "developer": {
-    "name": "Microsoft India Pvt Ltd",
-    "websiteUrl": "https://foundry-genie-teams-bot-tgd20260410.azurewebsites.net",
-    "privacyUrl": "https://foundry-genie-teams-bot-tgd20260410.azurewebsites.net/privacy",
-    "termsOfUseUrl": "https://foundry-genie-teams-bot-tgd20260410.azurewebsites.net/terms"
+    "name": "Contoso",
+    "websiteUrl": "https://${TEAMS_HOST}",
+    "privacyUrl": "https://${TEAMS_HOST}/privacy",
+    "termsOfUseUrl": "https://${TEAMS_HOST}/terms"
   },
   "name": {
-    "short": "Campaign Assistant",
-    "full": "Market Campaign Analytics Assistant"
+    "short": "camp_buddy",
+    "full": "camp_buddy - Market Campaign Analytics Assistant"
   },
   "description": {
     "short": "Ask questions about campaign data",
@@ -24,7 +24,7 @@
   "accentColor": "#0078D4",
   "bots": [
     {
-      "botId": "571bec3a-2b63-4460-acda-52e643c0c8df",
+      "botId": "${BOT_APP_ID}",
       "scopes": ["personal", "team", "groupChat"],
       "supportsFiles": false,
       "isNotificationOnly": false,
@@ -43,6 +43,6 @@
   ],
   "permissions": ["identity", "messageTeamMembers"],
   "validDomains": [
-    "foundry-genie-teams-bot-tgd20260410.azurewebsites.net"
+    "${TEAMS_HOST}"
   ]
 }

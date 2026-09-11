@@ -14,6 +14,30 @@ Foundry Genie bridges the gap between business users and data analytics by provi
 - **Flexible Authentication**: Supports both Machine-to-Machine (M2M) and User-to-Machine (U2M) authentication
 - **Enterprise Ready**: Docker containerization, Azure deployment, Redis session management
 - **Scalable Agent Architecture**: Built on Azure AI Agents SDK for reliable, production-grade AI interactions
+- **Industry Premium Tool**: `query_industry_premium` reads the General Insurance Council (GIC) segment-wise workbook directly for exact Indian non-life insurer figures (see below)
+
+## 🏦 Industry Premium Tool (GIC non-life data)
+
+`query_industry_premium` is a client-side function tool (in `src/shared/gic_reports.py`
++ `src/shared/gic_premium.py`, wired into the agent in `agent_rest.py`) that reads
+the **GIC segment-wise premium workbook** directly and returns exact tabular
+figures for Indian **non-life** insurers. The agent finds the right report itself
+— the user never supplies a URL, filename, or period format.
+
+**Important characteristics / limitations:**
+
+- **Measure is Gross Direct Premium Income** (INR crore, usually provisional) —
+  **not** Gross Written Premium. GWP additionally includes reinsurance accepted;
+  no source found publishes industry-wide GWP. The tool reports the closest
+  published measure, accurately labelled.
+- **Non-life only.** Life insurers (HDFC Life, SBI Life, LIC, …) are refused with
+  a distinct signal so the model can say "not covered" rather than "not found".
+- **No web search / domain allowlist exists in this repo**, so there is nothing to
+  remove to make the tool the sole path to `gicouncil.in` (spec §8 is N/A here). If
+  a web-search capability with an allowlist is added later, drop `gicouncil.in`
+  from it so the model reaches GIC data only through this tool.
+- **Offline-testable:** `gic_reports`/`gic_premium` have no cloud-SDK dependency.
+  Run: `pip install -r requirements-dev.txt && PYTHONPATH=src pytest src/test/test_gic_reports.py src/test/test_gic_premium.py`
 
 ## 🏗️ Architecture
 
@@ -220,9 +244,25 @@ After starting the application, navigate to `http://localhost:8000`:
 
 ### Microsoft Teams Bot
 
-1. Deploy the Teams bot using the manifest in `manifest/manifest.json`
-2. Users can mention the bot and ask campaign-related questions
-3. The bot responds with insights from Databricks Genie Space
+Prerequisites: the Terraform stack is deployed (Azure Bot + Teams channel), and
+the Teams bot App Service is running.
+
+1. **Build the app package** (fills the bot id + host from Terraform outputs):
+   ```bash
+   ./manifest/package-teams-app.sh
+   # or: BOT_APP_ID=<guid> TEAMS_APP_URL=https://<host> ./manifest/package-teams-app.sh
+   ```
+   Produces `manifest/build/teams-app.zip` (git-ignored).
+2. **Sideload**: Teams → **Apps** → **Manage your apps** → **Upload an app** →
+   **Upload a custom app** → select `teams-app.zip`. (Requires custom-app upload
+   enabled in the Teams admin setup policy.)
+3. **Chat** with the *Campaign Assistant* bot and ask a campaign question.
+4. In **U2M** mode the bot first replies with a **Sign in to Databricks** card;
+   complete the browser sign-in, return to Teams, and ask again.
+
+> `manifest/manifest.json` is a template using `${BOT_APP_ID}` / `${TEAMS_HOST}`
+> placeholders — never commit real deployment ids; the script fills them at build
+> time. A **SingleTenant** bot only authenticates users in its own tenant.
 
 ## 🔐 Authentication Modes
 

@@ -25,6 +25,25 @@
 # ============================================================================
 set -euo pipefail
 
+# ============================================================================
+# ⚠️  SUPERSEDED BY TERRAFORM (infra/terraform/)
+#
+# The VNet, subnets, NSG (+rules), private DNS zones, and private endpoints for
+# Databricks and Foundry are now created by the Terraform networking module
+# (infra/terraform/modules/networking + the private endpoints in each module).
+# Running this script on top of a Terraform-managed deployment will create
+# DUPLICATE / conflicting resources.
+#
+# It is kept only as a reference / break-glass tool. To run it anyway (e.g. for
+# a non-Terraform environment), set RUN_LEGACY_NETWORKING=1 explicitly.
+# ============================================================================
+if [[ "${RUN_LEGACY_NETWORKING:-0}" != "1" ]]; then
+  echo "[skip] setup-networking.sh is superseded by Terraform (infra/terraform/)." >&2
+  echo "       Networking is provisioned by 'terraform apply'. To force the legacy" >&2
+  echo "       path anyway, re-run with RUN_LEGACY_NETWORKING=1." >&2
+  exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TF_DIR="${SCRIPT_DIR}/terraform"
 

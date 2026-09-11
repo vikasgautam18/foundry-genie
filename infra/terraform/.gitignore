@@ -1,0 +1,12 @@
+# Terraform working files — never commit these
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Real variable / backend files (only *.example are committed)
+terraform.tfvars
+*.auto.tfvars
+backend.hcl

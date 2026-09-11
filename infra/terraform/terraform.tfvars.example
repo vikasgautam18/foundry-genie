@@ -1,0 +1,43 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is GIT-IGNORED.
+# Do NOT commit real secrets, subscription/tenant IDs, or hostnames.
+
+# subscription_id = "00000000-0000-0000-0000-000000000000"
+# tenant_id       = "00000000-0000-0000-0000-000000000000"
+
+location            = "centralindia"
+resource_group_name = "genie_demo_rg"
+name_prefix         = "geniedemo"
+# name_suffix is auto-generated (random 5 chars) for globally-unique names.
+# Set it explicitly if you want stable names: name_suffix = "abc12"
+
+# Networking (full private)
+public_network_access = false
+
+# Foundry model — the ACCOUNT goes in a region that supports the model's
+# GlobalStandard SKU. centralindia does NOT offer gpt-5.4 GlobalStandard, so the
+# account defaults to southindia (in-region for India) while its private
+# endpoint stays in the centralindia VNet.
+foundry_location              = "southindia"
+foundry_model_deployment_name = "gpt-5.4"
+foundry_model_name            = "gpt-5.4"
+foundry_model_version         = "2026-03-05"
+foundry_model_sku             = "GlobalStandard"
+foundry_model_capacity        = 50
+
+# Databricks
+databricks_sku                  = "premium"
+databricks_auth_mode            = "u2m"
+create_databricks_sql_warehouse = false
+
+# Filled AFTER the manual Databricks steps (see README):
+# genie_space_id                 = ""
+# databricks_oauth_client_id     = ""
+# databricks_oauth_client_secret = ""   # provide via env: TF_VAR_databricks_oauth_client_secret
+# databricks_sp_client_id        = ""
+
+# App Service
+app_service_sku = "B1"
+
+# Teams
+bot_app_type     = "SingleTenant"
+bot_display_name = "Campaign Assistant"
